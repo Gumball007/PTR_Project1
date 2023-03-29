@@ -1,10 +1,7 @@
 defmodule Reader do
     use GenServer
 
-  # Reader.start("localhost:4000/tweets/1")  
   def start(url) do
-    # PoolSupervisor.start(3)
-    # Mediator.start()
     GenServer.start_link(__MODULE__, url: url)
   end
 
@@ -14,21 +11,34 @@ defmodule Reader do
     {:ok, nil}
   end
 
+  defp load_bad_words do
+    content = File.read!("./lib/bad_words.json")
+    Jason.decode!(content)
+  end
+
+  defp filter_bad_words(message) do
+    Enum.reduce(load_bad_words(), message, fn bad_word, filtered_message ->
+      String.replace(filtered_message, bad_word, String.duplicate("*", String.length(bad_word)))
+    end)
+    # IO.puts()
+  end
+
   def handle_info(%HTTPoison.AsyncChunk{chunk: chunk}, _state) do
     case Regex.run(~r/data: ({.+})\n\n$/, chunk) do
       [_, data] ->
-        # IO.inspect data
         case Jason.decode(data) do
-            {:ok, result} ->
-                GenServer.cast(:mediator, {:mediate, result["message"]["tweet"]["text"]})
-            {:error, _} ->
-                GenServer.cast(:mediator, :kill)
+          {:ok, result} ->
+              message_text = result["message"]["tweet"]["text"]
+              filtered_message_text = filter_bad_words(message_text)
+              GenServer.cast(:mediator, {:mediate, filtered_message_text})
+          {:error, _} ->
+              GenServer.cast(:mediator, :kill)
         end
       nil ->
-        raise "Don't know how to parse received chunk: \"#{chunk}\""
+        IO.puts "Don't know how to parse received chunk: \"#{chunk}\""
     end
     {:noreply, nil}
-    end
+  end
 
   def handle_info(%HTTPoison.AsyncStatus{} = status, _state) do
     IO.puts "Connection status: #{inspect status}"
@@ -41,6 +51,7 @@ defmodule Reader do
   end
 end
 
+# ReaderSupervisor.start()
 defmodule ReaderSupervisor do
   use Supervisor
 
@@ -69,5 +80,4 @@ defmodule ReaderSupervisor do
     ]
       Supervisor.init(children, strategy: :one_for_one, max_restarts: 10)
   end
-
 end

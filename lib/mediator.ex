@@ -28,7 +28,6 @@ defmodule Mediator do
             state == 2 ->
                 {:noreply, 0}
         end
-        {:noreply, state}
     end
 
 end
