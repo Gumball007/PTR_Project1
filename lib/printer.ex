@@ -11,7 +11,7 @@ defmodule Printer do
 
     def handle_cast({:send, message}, _) do
         Process.sleep(Enum.random(500..2000))
-        IO.inspect "#{inspect self()} -- #{message}"
+        IO.inspect message
         {:noreply, nil}
     end
 
